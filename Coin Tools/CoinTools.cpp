@@ -65,7 +65,7 @@ static std::unordered_map<int, std::function<void(YYTKCodeEvent* pCodeEvent, CIn
 
 static const char* playStr = "Play Modded!";
 RefString tempVar = RefString(playStr, strlen(playStr), false);
-RefString* moddedVerRef = nullptr;
+static bool versionTextChanged = false;
 
 std::string GenerateRunFileName() {
     const auto now = std::chrono::system_clock::now();
@@ -150,20 +150,13 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 		codeIndexToName[Code->i_CodeIndex] = Code->i_pName;
 		if (_strcmpi(Code->i_pName, "gml_Object_obj_TitleScreen_Create_0") == 0) {
 			auto TitleScreen_Create_0 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				YYRValue yyrv_version;
-				CallBuiltin(yyrv_version, "variable_global_get", Self, Other, { "version" });
-
-				const char* moddedStr = " (Modded)";
-				char* tempStr = new char[strlen(yyrv_version) + strlen(moddedStr) + 1];
-				strcpy(tempStr, yyrv_version);
-				strcat(tempStr, moddedStr);
-				moddedVerStr = tempStr;
-				if (moddedVerRef != nullptr) {
-					delete moddedVerRef;
+				if (versionTextChanged == false) {
+					YYRValue yyrv_version;
+					CallBuiltin(yyrv_version, "variable_global_get", Self, Other, { "version" });
+					std::string moddedVerStr = yyrv_version.operator std::string() + " (Modded)";
+					CallBuiltin(yyrv_version, "variable_global_set", Self, Other, { "version", moddedVerStr.c_str() });
+					versionTextChanged = true;
 				}
-				moddedVerRef = new RefString(moddedVerStr, strlen(moddedVerStr), false);
-
-				CallBuiltin(yyrv_version, "variable_global_set", Self, Other, { "version", moddedVerRef->m_Thing });
 
 				pCodeEvent->Call(Self, Other, Code, Res, Flags);
 			};
