@@ -55,19 +55,44 @@ static std::vector<const char*> availableStickers;
 static std::unordered_map<int, int> stickerVarMap;
 static std::ofstream runLogFile;
 
+/* GML functions */
+TRoutine VariableInstanceGet;
+TRoutine VariableGlobalGet;
+TRoutine StructGet;
+
+struct ArgSetup {
+	RValue args[2] = {};
+	ArgSetup(long long arg1, const char* arg2) {
+		args[0].I64 = arg1;
+		args[0].Kind = VALUE_INT64;
+		std::shared_ptr<RefString> arg2RefString = std::make_shared<RefString>(arg2, strlen(arg2), false);
+		args[1].String = arg2RefString.get();
+		args[1].Kind = VALUE_STRING;
+	}
+};
+
+inline void CallOriginal(YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
+	if (!pCodeEvent->CalledOriginal()) {
+		pCodeEvent->Call(Self, Other, Code, Res, Flags);
+	}
+}
+
 // Config vars
 static struct Config {
 	bool logRuns = true;
+	bool debugEnabled = true;
 } config;
 
 void to_json(json& j, const Config& c) {
 	j = json{ 
-		{"logRuns", c.logRuns}
+		{ "logRuns", c.logRuns },
+		{ "debugEnabled", c.debugEnabled }
 	};
 }
 
 void from_json(const json& j, Config& c) {
 	j.at("logRuns").get_to(c.logRuns);
+	j.at("debugEnabled").get_to(c.debugEnabled);
 }
 
 static std::unordered_map<int, const char*> codeIndexToName;
@@ -172,22 +197,14 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 					versionTextChanged = true;
 				}
 
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 			};
 			TitleScreen_Create_0(pCodeEvent, Self, Other, Code, Res, Flags);
 			codeFuncTable[Code->i_CodeIndex] = TitleScreen_Create_0;
 		}
 		else if (_strcmpi(Code->i_pName, "gml_Object_obj_TextController_Create_0") == 0) {
 			auto TextController_Create_0 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				YYRValue yyrv_textContainer;
 				CallBuiltin(yyrv_textContainer, "variable_global_get", Self, Other, { "TextContainer" });
 				PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : TextContainer", GetFileName(__FILE__).c_str(), __LINE__);
@@ -201,6 +218,24 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 					yyrv_eng.RefArray->m_Array[0].String = &tempVar;
 					PrintMessage(CLR_TANGERINE, "[%s:%d] variable_global_set : eng[0]", GetFileName(__FILE__).c_str(), __LINE__);
 				}
+
+				if (GetFunctionByName("variable_instance_get", VariableInstanceGet) == true) {
+					PrintMessage(CLR_GREEN, "\"variable_instance_get\" found!");
+				} else {
+					PrintError(__FILE__, __LINE__, "Failed to get \"variable_instance_get\"!");
+				}
+
+				if (GetFunctionByName("variable_global_get", VariableGlobalGet) == true) {
+					PrintMessage(CLR_GREEN, "\"variable_global_get\" found!");
+				} else {
+					PrintError(__FILE__, __LINE__, "Failed to get \"variable_global_get\"!");
+				}
+
+				if (GetFunctionByName("struct_get", StructGet) == true) {
+					PrintMessage(CLR_GREEN, "\"struct_get\" found!");
+				} else {
+					PrintError(__FILE__, __LINE__, "Failed to get \"struct_get\"!");
+				}
 			};
 			TextController_Create_0(pCodeEvent, Self, Other, Code, Res, Flags);
 			codeFuncTable[Code->i_CodeIndex] = TextController_Create_0;
@@ -209,22 +244,14 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 		{
 			auto EnemyDead_Create_0 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
 				enemiesKilled++;
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 			};
 			EnemyDead_Create_0(pCodeEvent, Self, Other, Code, Res, Flags);
 			codeFuncTable[Code->i_CodeIndex] = EnemyDead_Create_0;
 		}
 		else if (_strcmpi(Code->i_pName, "gml_Object_obj_StageManager_Create_0") == 0) {
 			auto StageManager_Create_0 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				enemiesKilled = 0;
 				currentMinCoinsGained = 0;
 				prevCoinsGained = 0;
@@ -241,11 +268,7 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 			auto StageManager_Step_0 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
 				// Block only runs if game timer is not paused (pause menu, level up, stamp, anvil, etc.)
 
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 
 				// Get global bool timePause
 				YYRValue yyrv_timePause;
@@ -288,11 +311,7 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 		}
 		else if (_strcmpi(Code->i_pName, "gml_Object_obj_Sticker_Collision_obj_Player") == 0) {
 			auto Sticker_Collision_obj_Player = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				YYRValue yyrv_collectedSticker;
 				CallBuiltin(yyrv_collectedSticker, "variable_global_get", Self, Other, { "collectedSticker" });
 				PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : collectedSticker", GetFileName(__FILE__).c_str(), __LINE__);
@@ -306,18 +325,14 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 		}
 		else if (_strcmpi(Code->i_pName, "gml_Object_obj_PlayerManager_Create_0") == 0) {
 			auto PlayerManager_Create_0 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				YYRValue yyrv_currentStickers;
 				CallBuiltin(yyrv_currentStickers, "variable_global_get", Self, Other, { "currentStickers" });
 				PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : currentStickers", GetFileName(__FILE__).c_str(), __LINE__);
 				const RefDynamicArrayOfRValue* array = reinterpret_cast<const RefDynamicArrayOfRValue*>(yyrv_currentStickers.RefArray);
 				std::vector<int> result;
 				for (int i = 0; i < array->length; i++) {
-					const RValue &element = array->m_Array[i];
+					const RValue& element = array->m_Array[i];
 					if (element.Kind == VALUE_REAL) {
 						result.push_back(element.Real);
 					}
@@ -326,44 +341,18 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 				for (int i = 0; i < result.size(); i++) {
 					PrintMessage(CLR_BRIGHTPURPLE, "currentStickers[%d] = %d", i, result[i]);
 				}
-				YYRValue yyrv_gameOverTime;
-				CallBuiltin(yyrv_gameOverTime, "variable_instance_get", Self, Other, { (long long)Self->i_id, "gameOverTime" });
-				PrintMessage(CLR_AQUA, "[%s:%d] variable_instance_get : gameOverTime", GetFileName(__FILE__).c_str(), __LINE__);
-				ptr_gameOverTime = yyrv_gameOverTime.Pointer;
-				PrintMessage(CLR_BRIGHTPURPLE, "gameOverTime.Pointer = 0x%p", yyrv_gameOverTime.Pointer);
-				RValue deref_gameOverTime = *static_cast<YYRValue*>(ptr_gameOverTime);
-				PrintMessage(CLR_BRIGHTPURPLE, "gameOverTime = %d", deref_gameOverTime.I32);
+				
 			};
 			PlayerManager_Create_0(pCodeEvent, Self, Other, Code, Res, Flags);
 			codeFuncTable[Code->i_CodeIndex] = PlayerManager_Create_0;
-		}
-		// gml_Object_obj_PlayerManager_Create_0 - Line 1520
-		// function Confirmed_gml_Object_obj_PlayerManager_Create_0() - Line 965
-		else if (_strcmpi(Code->i_pName, "gml_Script_Confirmed_gml_Object_obj_PlayerManager_Create_0") == 0) {
-			auto Confirmed_gml_Object_obj_PlayerManager_Create_0 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
-				PrintMessage(CLR_BRIGHTPURPLE, "Confirmed Triggered!");
-			};
-			Confirmed_gml_Object_obj_PlayerManager_Create_0(pCodeEvent, Self, Other, Code, Res, Flags);
-			codeFuncTable[Code->i_CodeIndex] = Confirmed_gml_Object_obj_PlayerManager_Create_0;
-		}
-		else if (_strcmpi(Code->i_pName, "gml_Object_obj_PlayerManager_Draw_64") == 0) {
+		} else if (_strcmpi(Code->i_pName, "gml_Object_obj_PlayerManager_Draw_64") == 0) {
 			auto PlayerManager_Draw_64 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
-				/*YYRValue yyrv_gameOverTime;
-				CallBuiltin(yyrv_gameOverTime, "variable_instance_get", Self, Other, { (long long)Self->i_id, "gameOverTime" });
-				PrintMessage(CLR_AQUA, "[%s:%d] variable_instance_get : gameOverTime", GetFileName(__FILE__).c_str(), __LINE__);*/
-				YYRValue deref_gameOverTime = *static_cast<YYRValue*>(ptr_gameOverTime);
-				PrintMessage(CLR_BRIGHTPURPLE, "gameOverTime TEST = %d", static_cast<int>(deref_gameOverTime));
-				if (static_cast<int>(deref_gameOverTime) >= 330 && gameEnded == false) {
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
+				YYRValue yyrv_gameOverTime;
+				
+				VariableInstanceGet(&yyrv_gameOverTime, Self, Other, 2, argSetup.args);
+				PrintMessage(CLR_DARKBLUE, "[%s:%d] variable_instance_get : gameOverTime", GetFileName(__FILE__).c_str(), __LINE__);
+				if (static_cast<int>(yyrv_gameOverTime) >= 330 && gameEnded == false) {
 					PrintMessage(CLR_DEFAULT, "Run Ended!");
 					YYRValue yyrv_scriptIndex;
 					CallBuiltin(yyrv_scriptIndex, "asset_get_index", Self, Other, { "gml_Script_CalculateScore" });
@@ -421,11 +410,7 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 		else // Not using this code function, so just quickly ignore it when it's called next time
 		{
 			auto UnmodifiedFunc = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
-				if (pCodeEvent->CalledOriginal() == true) {
-					pCodeEvent->Cancel(true);
-				} else {
-					pCodeEvent->Call(Self, Other, Code, Res, Flags);
-				}
+				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 			};
 			UnmodifiedFunc(pCodeEvent, Self, Other, Code, Res, Flags);
 			codeFuncTable[Code->i_CodeIndex] = UnmodifiedFunc;
