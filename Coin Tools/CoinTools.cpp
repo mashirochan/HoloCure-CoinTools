@@ -99,8 +99,14 @@ void to_json(json& j, const Config& c) {
 }
 
 void from_json(const json& j, Config& c) {
-	j.at("logRuns").get_to(c.logRuns);
-	j.at("debugEnabled").get_to(c.debugEnabled);
+	try {
+		j.at("logRuns").get_to(c.logRuns);
+		j.at("debugEnabled").get_to(c.debugEnabled);
+	} catch (const json::out_of_range& e) {
+		PrintError(__FILE__, __LINE__, "%s", e.what());
+		std::string fileName = formatString(std::string(mod.name)) + "-config.json";
+		GenerateConfig(fileName);
+	}
 }
 
 static std::unordered_map<int, const char*> codeIndexToName;
@@ -150,7 +156,6 @@ void GenerateConfig(std::string fileName) {
 
 	std::ofstream configFile("modconfigs/" + fileName);
 	if (configFile.is_open()) {
-		// [%s v%d.%d.%d] - PmCreateCallback failed with 0x%x", mod.name, mod.version.major, mod.version.minor, mod.version.build
 		PrintMessage(CLR_DEFAULT, "[%s v%d.%d.%d] - Config file \"%s\" created!", mod.name, mod.version.major, mod.version.minor, mod.version.build, fileName.c_str());
 		configFile << std::setw(4) << data << std::endl;
 		configFile.close();
@@ -473,9 +478,9 @@ DllExport YYTKStatus PluginEntry(YYTKPlugin* PluginObject)
 
 		if (GetFileAttributes(dirName) == INVALID_FILE_ATTRIBUTES) {
 			if (CreateDirectory(dirName, NULL)) {
-				std::wcout << L"Directory \"modconfigs\" created!" << std::endl;
+				PrintMessage(CLR_GREEN, "[%s v%d.%d.%d] - Directory \"modconfigs\" created!", mod.name, mod.version.major, mod.version.minor, mod.version.build);
 			} else {
-				std::cerr << "Failed to create the modconfigs directory. Error code: " << GetLastError() << std::endl;
+				PrintError(__FILE__, __LINE__, "Failed to create the modconfigs directory. Error code: %lu", GetLastError());
 				return YYTK_FAIL;
 			}
 		}
