@@ -57,23 +57,27 @@ static std::ofstream runLogFile;
 
 /* GML functions */
 TRoutine VariableInstanceGet;
-TRoutine VariableGlobalGet;
-TRoutine StructGet;
 
 struct ArgSetup {
 	RValue args[2] = {};
 	bool isInitialized = false;
 	ArgSetup() {}
+	ArgSetup(const char* arg2) {
+		args[0].String = RefString::Alloc(arg2, strlen(arg2), false);
+		args[0].Kind = VALUE_STRING;
+		isInitialized = true;
+	}
 	ArgSetup(long long arg1, const char* arg2) {
 		args[0].I64 = arg1;
 		args[0].Kind = VALUE_INT64;
-		std::shared_ptr<RefString> arg2RefString = std::make_shared<RefString>(arg2, strlen(arg2), false);
-		args[1].String = arg2RefString.get();
+		args[1].String = RefString::Alloc(arg2, strlen(arg2), false);
 		args[1].Kind = VALUE_STRING;
 		isInitialized = true;
 	}
 };
 ArgSetup args_gameOverTime;
+
+YYRValue yyrv_gameOverTime;
 
 inline void CallOriginal(YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
 	if (!pCodeEvent->CalledOriginal()) {
@@ -84,7 +88,7 @@ inline void CallOriginal(YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* 
 // Config vars
 static struct Config {
 	bool logRuns = true;
-	bool debugEnabled = true;
+	bool debugEnabled = false;
 } config;
 
 void to_json(json& j, const Config& c) {
@@ -146,11 +150,12 @@ void GenerateConfig(std::string fileName) {
 
 	std::ofstream configFile("modconfigs/" + fileName);
 	if (configFile.is_open()) {
-		PrintMessage(CLR_DEFAULT, "Config file \"%s\" created!", fileName.c_str());
+		// [%s v%d.%d.%d] - PmCreateCallback failed with 0x%x", mod.name, mod.version.major, mod.version.minor, mod.version.build
+		PrintMessage(CLR_DEFAULT, "[%s v%d.%d.%d] - Config file \"%s\" created!", mod.name, mod.version.major, mod.version.minor, mod.version.build, fileName.c_str());
 		configFile << std::setw(4) << data << std::endl;
 		configFile.close();
 	} else {
-		PrintError(__FILE__, __LINE__, "Error opening config file \"%s\"", fileName.c_str());
+		PrintError(__FILE__, __LINE__, "[%s v%d.%d.%d] - Error opening config file \"%s\"", mod.name, mod.version.major, mod.version.minor, mod.version.build, fileName.c_str());
 	}
 }
 
@@ -192,11 +197,11 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 				if (versionTextChanged == false) {
 					YYRValue yyrv_version;
 					CallBuiltin(yyrv_version, "variable_global_get", Self, Other, { "version" });
-					PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : version", GetFileName(__FILE__).c_str(), __LINE__);
+					if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : version", GetFileName(__FILE__).c_str(), __LINE__);
 					if (yyrv_version.operator std::string().find("Modded") == std::string::npos) {
 						std::string moddedVerStr = yyrv_version.operator std::string() + " (Modded)";
 						CallBuiltin(yyrv_version, "variable_global_set", Self, Other, { "version", moddedVerStr.c_str() });
-						PrintMessage(CLR_TANGERINE, "[%s:%d] variable_global_set : version", GetFileName(__FILE__).c_str(), __LINE__);
+						if (config.debugEnabled) PrintMessage(CLR_TANGERINE, "[%s:%d] variable_global_set : version", GetFileName(__FILE__).c_str(), __LINE__);
 					}
 					versionTextChanged = true;
 				}
@@ -211,34 +216,22 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				YYRValue yyrv_textContainer;
 				CallBuiltin(yyrv_textContainer, "variable_global_get", Self, Other, { "TextContainer" });
-				PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : TextContainer", GetFileName(__FILE__).c_str(), __LINE__);
+				if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : TextContainer", GetFileName(__FILE__).c_str(), __LINE__);
 				YYRValue yyrv_titleButtons;
 				CallBuiltin(yyrv_titleButtons, "struct_get", Self, Other, { yyrv_textContainer, "titleButtons" });
-				PrintMessage(CLR_AQUA, "[%s:%d] struct_get : titleButtons", GetFileName(__FILE__).c_str(), __LINE__);
+				if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] struct_get : titleButtons", GetFileName(__FILE__).c_str(), __LINE__);
 				YYRValue yyrv_eng;
 				CallBuiltin(yyrv_eng, "struct_get", Self, Other, { yyrv_titleButtons, "eng" });
-				PrintMessage(CLR_AQUA, "[%s:%d] struct_get : eng", GetFileName(__FILE__).c_str(), __LINE__);
+				if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] struct_get : eng", GetFileName(__FILE__).c_str(), __LINE__);
 				if (std::string(yyrv_eng.RefArray->m_Array[0].String->Get()).find("Modded") == std::string::npos) {
 					yyrv_eng.RefArray->m_Array[0].String = &tempVar;
-					PrintMessage(CLR_TANGERINE, "[%s:%d] variable_global_set : eng[0]", GetFileName(__FILE__).c_str(), __LINE__);
+					if (config.debugEnabled) PrintMessage(CLR_TANGERINE, "[%s:%d] variable_global_set : eng[0]", GetFileName(__FILE__).c_str(), __LINE__);
 				}
 
 				if (GetFunctionByName("variable_instance_get", VariableInstanceGet) == true) {
-					PrintMessage(CLR_GREEN, "\"variable_instance_get\" found!");
+					PrintMessage(CLR_GREEN, "[%s v%d.%d.%d] - \"variable_instance_get\" found!", mod.name, mod.version.major, mod.version.minor, mod.version.build);
 				} else {
-					PrintError(__FILE__, __LINE__, "Failed to get \"variable_instance_get\"!");
-				}
-
-				if (GetFunctionByName("variable_global_get", VariableGlobalGet) == true) {
-					PrintMessage(CLR_GREEN, "\"variable_global_get\" found!");
-				} else {
-					PrintError(__FILE__, __LINE__, "Failed to get \"variable_global_get\"!");
-				}
-
-				if (GetFunctionByName("struct_get", StructGet) == true) {
-					PrintMessage(CLR_GREEN, "\"struct_get\" found!");
-				} else {
-					PrintError(__FILE__, __LINE__, "Failed to get \"struct_get\"!");
+					PrintError(__FILE__, __LINE__, "[%s v%d.%d.%d] - Failed to get \"variable_instance_get\"!", mod.name, mod.version.major, mod.version.minor, mod.version.build);
 				}
 			};
 			TextController_Create_0(pCodeEvent, Self, Other, Code, Res, Flags);
@@ -274,11 +267,6 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 
 				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 
-				// Get global bool timePause
-				YYRValue yyrv_timePause;
-				CallBuiltin(yyrv_timePause, "variable_global_get", Self, Other, { "timePause" });
-				PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : timePause", GetFileName(__FILE__).c_str(), __LINE__);
-
 				// Increment game timer
 				gameTimer++;
 
@@ -290,7 +278,7 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 					// Get global int currentRunMoneyGained
 					YYRValue yyrv_currentRunMoneyGained;
 					CallBuiltin(yyrv_currentRunMoneyGained, "variable_global_get", Self, Other, { "currentRunMoneyGained" });
-					PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : currentRunMoneyGained", GetFileName(__FILE__).c_str(), __LINE__);
+					if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : currentRunMoneyGained", GetFileName(__FILE__).c_str(), __LINE__);
 
 					currentMinCoinsGained = (int) yyrv_currentRunMoneyGained - prevCoinsGained;
 					prevCoinsGained = (int) yyrv_currentRunMoneyGained;
@@ -318,10 +306,10 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				YYRValue yyrv_collectedSticker;
 				CallBuiltin(yyrv_collectedSticker, "variable_global_get", Self, Other, { "collectedSticker" });
-				PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : collectedSticker", GetFileName(__FILE__).c_str(), __LINE__);
+				if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : collectedSticker", GetFileName(__FILE__).c_str(), __LINE__);
 				YYRValue yyrv_optionName;
 				CallBuiltin(yyrv_optionName, "struct_get", Self, Other, { yyrv_collectedSticker, "optionName" });
-				PrintMessage(CLR_AQUA, "[%s:%d] struct_get : optionName", GetFileName(__FILE__).c_str(), __LINE__);
+				if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] struct_get : optionName", GetFileName(__FILE__).c_str(), __LINE__);
 				PrintMessage(CLR_BRIGHTPURPLE, "Sticker Name: %s", static_cast<const char*>(yyrv_optionName));
 			};
 			Sticker_Collision_obj_Player(pCodeEvent, Self, Other, Code, Res, Flags);
@@ -332,7 +320,7 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				YYRValue yyrv_currentStickers;
 				CallBuiltin(yyrv_currentStickers, "variable_global_get", Self, Other, { "currentStickers" });
-				PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : currentStickers", GetFileName(__FILE__).c_str(), __LINE__);
+				if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : currentStickers", GetFileName(__FILE__).c_str(), __LINE__);
 				const RefDynamicArrayOfRValue* array = reinterpret_cast<const RefDynamicArrayOfRValue*>(yyrv_currentStickers.RefArray);
 				std::vector<int> result;
 				for (int i = 0; i < array->length; i++) {
@@ -352,64 +340,66 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 		} else if (_strcmpi(Code->i_pName, "gml_Object_obj_PlayerManager_Draw_64") == 0) {
 			auto PlayerManager_Draw_64 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
 				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
-				YYRValue yyrv_gameOverTime;
 				if (args_gameOverTime.isInitialized == false) {
 					args_gameOverTime = ArgSetup((long long)Self->i_id, "gameOverTime");
 				}
-				VariableInstanceGet(&yyrv_gameOverTime, Self, Other, 2, args_gameOverTime.args);
-				PrintMessage(CLR_DARKBLUE, "[%s:%d] variable_instance_get : gameOverTime", GetFileName(__FILE__).c_str(), __LINE__);
-				PrintMessage(CLR_BRIGHTPURPLE, "yyrv_gameOverTime = %d", static_cast<int>(yyrv_gameOverTime));
-				if (static_cast<int>(yyrv_gameOverTime) >= 330 && gameEnded == false) {
-					PrintMessage(CLR_DEFAULT, "Run Ended!");
-					YYRValue yyrv_scriptIndex;
-					CallBuiltin(yyrv_scriptIndex, "asset_get_index", Self, Other, { "gml_Script_CalculateScore" });
-					PrintMessage(CLR_AQUA, "[%s:%d] asset_get_index : gml_Script_CalculateScore", GetFileName(__FILE__).c_str(), __LINE__);
-					scoreFuncIndex = static_cast<int>(yyrv_scriptIndex);
-					YYRValue yyrv_score;
-					CallBuiltin(yyrv_score, "script_execute", Self, Other, { (double) scoreFuncIndex, 0.0, 0.0, 0.0 });
-					PrintMessage(CLR_MATRIXGREEN, "[%s:%d] script_execute : gml_Script_CalculateScore", GetFileName(__FILE__).c_str(), __LINE__);
-					PrintMessage(CLR_DEFAULT, "Score: %d", static_cast<int>(yyrv_score));
-					YYRValue yyrv_haluBonusCoins;
-					CallBuiltin(yyrv_haluBonusCoins, "variable_instance_get", Self, Other, { (long long)Self->i_id, "haluBonusCoins" });
-					PrintMessage(CLR_AQUA, "[%s:%d] variable_instance_get : haluBonusCoins", GetFileName(__FILE__).c_str(), __LINE__);
-					haluBonusCoins = floor(static_cast<int>(yyrv_haluBonusCoins));
-					YYRValue yyrv_currentRunMoneyGained;
-					CallBuiltin(yyrv_currentRunMoneyGained, "variable_global_get", Self, Other, { "currentRunMoneyGained" });
-					PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : currentRunMoneyGained", GetFileName(__FILE__).c_str(), __LINE__);
-					currentRunCoins = static_cast<int>(yyrv_currentRunMoneyGained);
-					totalRunCoins = floor(currentRunCoins + haluBonusCoins);
-					PrintMessage(CLR_YELLOW, "Run Coins: %d + %d (HALU BONUS)", currentRunCoins, haluBonusCoins);
-					PrintMessage(CLR_YELLOW, "Total:     %d", totalRunCoins);
-					gameEnded = true;
+				if (gameEnded == false) {
+					VariableInstanceGet(&yyrv_gameOverTime, Self, Other, 2, args_gameOverTime.args);
+					if (config.debugEnabled) PrintMessage(CLR_GRAY, "[%s:%d] variable_instance_get : gameOverTime", GetFileName(__FILE__).c_str(), __LINE__);
 
-					if (config.logRuns == true) {
-						const wchar_t* dirName = L"runlogs";
+					if (static_cast<int>(yyrv_gameOverTime) >= 330) {
+						PrintMessage(CLR_DEFAULT, "Run Ended!");
+						YYRValue yyrv_scriptIndex;
+						CallBuiltin(yyrv_scriptIndex, "asset_get_index", Self, Other, { "gml_Script_CalculateScore" });
+						if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] asset_get_index : gml_Script_CalculateScore", GetFileName(__FILE__).c_str(), __LINE__);
+						scoreFuncIndex = static_cast<int>(yyrv_scriptIndex);
+						YYRValue yyrv_score;
+						CallBuiltin(yyrv_score, "script_execute", Self, Other, { (double)scoreFuncIndex, 0.0, 0.0, 0.0 });
+						if (config.debugEnabled) PrintMessage(CLR_MATRIXGREEN, "[%s:%d] script_execute : gml_Script_CalculateScore", GetFileName(__FILE__).c_str(), __LINE__);
+						PrintMessage(CLR_DEFAULT, "Score: %d", static_cast<int>(yyrv_score));
+						YYRValue yyrv_haluBonusCoins;
+						CallBuiltin(yyrv_haluBonusCoins, "variable_instance_get", Self, Other, { (long long)Self->i_id, "haluBonusCoins" });
+						if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] variable_instance_get : haluBonusCoins", GetFileName(__FILE__).c_str(), __LINE__);
+						haluBonusCoins = floor(static_cast<int>(yyrv_haluBonusCoins));
+						YYRValue yyrv_currentRunMoneyGained;
+						CallBuiltin(yyrv_currentRunMoneyGained, "variable_global_get", Self, Other, { "currentRunMoneyGained" });
+						if (config.debugEnabled) PrintMessage(CLR_AQUA, "[%s:%d] variable_global_get : currentRunMoneyGained", GetFileName(__FILE__).c_str(), __LINE__);
+						currentRunCoins = static_cast<int>(yyrv_currentRunMoneyGained);
+						totalRunCoins = floor(currentRunCoins + haluBonusCoins);
+						PrintMessage(CLR_YELLOW, "Run Coins: %d + %d (HALU BONUS)", currentRunCoins, haluBonusCoins);
+						PrintMessage(CLR_YELLOW, "Total:     %d", totalRunCoins);
+						gameEnded = true;
 
-						if (GetFileAttributes(dirName) == INVALID_FILE_ATTRIBUTES) {
-							if (CreateDirectory(dirName, NULL)) {
-								std::wcout << L"Directory \"runlogs\" created!" << std::endl;
+						if (config.logRuns == true) {
+							const wchar_t* dirName = L"runlogs";
+
+							if (GetFileAttributes(dirName) == INVALID_FILE_ATTRIBUTES) {
+								if (CreateDirectory(dirName, NULL)) {
+									std::wcout << L"Directory \"runlogs\" created!" << std::endl;
+								} else {
+									std::cerr << "Failed to create the Run Logs directory. Error code: " << GetLastError() << std::endl;
+									return;
+								}
+							}
+
+							std::string fileName = GenerateRunFileName();
+
+							runLogFile.open("runlogs/" + fileName + ".txt");
+							if (runLogFile.is_open()) {
+								runLogFile << "Run Data - " << fileName << std::endl;
+								runLogFile << "Score: " << static_cast<int>(yyrv_score) << std::endl;
+								runLogFile << "Run Coins: " << currentRunCoins << " + " << haluBonusCoins << " (HALU BONUS)" << std::endl;
+								runLogFile << "Total:     " << totalRunCoins << std::endl;
+								PrintMessage(CLR_DEFAULT, "Run log \"%s.txt\" created!", fileName.c_str());
+								runLogFile.close();
 							} else {
-								std::cerr << "Failed to create the Run Logs directory. Error code: " << GetLastError() << std::endl;
+								PrintMessage(CLR_RED, "Error opening file \"%s.txt\"", fileName.c_str());
 								return;
 							}
 						}
-
-						std::string fileName = GenerateRunFileName();
-
-						runLogFile.open("runlogs/" + fileName + ".txt");
-						if (runLogFile.is_open()) {
-							runLogFile << "Run Data - " << fileName << std::endl;
-							runLogFile << "Score: " << static_cast<int>(yyrv_score) << std::endl;
-							runLogFile << "Run Coins: " << currentRunCoins << " + " << haluBonusCoins << " (HALU BONUS)" << std::endl;
-							runLogFile << "Total:     " << totalRunCoins << std::endl;
-							PrintMessage(CLR_DEFAULT, "Run log \"%s.txt\" created!", fileName.c_str());
-							runLogFile.close();
-						} else {
-							PrintMessage(CLR_RED, "Error opening file \"%s.txt\"", fileName.c_str());
-							return;
-						}
 					}
 				}
+				
 			};
 			PlayerManager_Draw_64(pCodeEvent, Self, Other, Code, Res, Flags);
 			codeFuncTable[Code->i_CodeIndex] = PlayerManager_Draw_64;
@@ -505,7 +495,7 @@ DllExport YYTKStatus PluginEntry(YYTKPlugin* PluginObject)
 			
 			config = data.template get<Config>();
 		}
-		PrintMessage(CLR_WHITE, "%s loaded successfully!", fileName.c_str());
+		PrintMessage(CLR_GREEN, "[%s v%d.%d.%d] - %s loaded successfully!", mod.name, mod.version.major, mod.version.minor, mod.version.build, fileName.c_str());
 	}
 
 	// Off it goes to the core.
