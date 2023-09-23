@@ -62,14 +62,18 @@ TRoutine StructGet;
 
 struct ArgSetup {
 	RValue args[2] = {};
+	bool isInitialized = false;
+	ArgSetup() {}
 	ArgSetup(long long arg1, const char* arg2) {
 		args[0].I64 = arg1;
 		args[0].Kind = VALUE_INT64;
 		std::shared_ptr<RefString> arg2RefString = std::make_shared<RefString>(arg2, strlen(arg2), false);
 		args[1].String = arg2RefString.get();
 		args[1].Kind = VALUE_STRING;
+		isInitialized = true;
 	}
 };
+ArgSetup args_gameOverTime;
 
 inline void CallOriginal(YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
 	if (!pCodeEvent->CalledOriginal()) {
@@ -349,9 +353,12 @@ YYTKStatus CodeCallback(YYTKEventBase* pEvent, void* OptionalArgument)
 			auto PlayerManager_Draw_64 = [](YYTKCodeEvent* pCodeEvent, CInstance* Self, CInstance* Other, CCode* Code, RValue* Res, int Flags) {
 				CallOriginal(pCodeEvent, Self, Other, Code, Res, Flags);
 				YYRValue yyrv_gameOverTime;
-				
-				VariableInstanceGet(&yyrv_gameOverTime, Self, Other, 2, argSetup.args);
+				if (args_gameOverTime.isInitialized == false) {
+					args_gameOverTime = ArgSetup((long long)Self->i_id, "gameOverTime");
+				}
+				VariableInstanceGet(&yyrv_gameOverTime, Self, Other, 2, args_gameOverTime.args);
 				PrintMessage(CLR_DARKBLUE, "[%s:%d] variable_instance_get : gameOverTime", GetFileName(__FILE__).c_str(), __LINE__);
+				PrintMessage(CLR_BRIGHTPURPLE, "yyrv_gameOverTime = %d", static_cast<int>(yyrv_gameOverTime));
 				if (static_cast<int>(yyrv_gameOverTime) >= 330 && gameEnded == false) {
 					PrintMessage(CLR_DEFAULT, "Run Ended!");
 					YYRValue yyrv_scriptIndex;
